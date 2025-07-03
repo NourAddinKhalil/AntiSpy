@@ -1,4 +1,4 @@
-package com.example.antispy
+package com.masterz.antispy
 
 import org.junit.Test
 
