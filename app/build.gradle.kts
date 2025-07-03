@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.antispy"
+    namespace = "com.masterz.antispy"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.antispy"
+        applicationId = "com.masterz.antispy"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

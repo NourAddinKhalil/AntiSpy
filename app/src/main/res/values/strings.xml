@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AntiSpy</string>
+    <string name="accessibility_service_description">AntiSpy sensor access detection</string>
 </resources>
