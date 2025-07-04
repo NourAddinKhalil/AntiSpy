@@ -11,6 +11,7 @@ object Preferences {
     private const val KEY_SHOW_CAMERA = "show_camera"
     private const val KEY_SHOW_MIC = "show_mic"
     private const val KEY_SHOW_GPS = "show_gps"
+    private const val KEY_TRACKING_ENABLED = "tracking_enabled"
 
     fun getPrefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -44,4 +45,10 @@ object Preferences {
 
     fun setGpsEnabled(context: Context, enabled: Boolean) =
         getPrefs(context).edit { putBoolean(KEY_SHOW_GPS, enabled) }
+
+    fun isTrackingEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_TRACKING_ENABLED, true)
+
+    fun setTrackingEnabled(context: Context, enabled: Boolean) =
+        getPrefs(context).edit { putBoolean(KEY_TRACKING_ENABLED, enabled) }
 }

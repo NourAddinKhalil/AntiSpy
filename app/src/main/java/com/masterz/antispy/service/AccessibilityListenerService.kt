@@ -60,6 +60,7 @@ class AccessibilityListenerService : AccessibilityService() {
     private var isLocInUse = false
 
     private fun showSensorNotification(sensorType: String, packageName: String) {
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this)) return
         val appName = AppUtils.getAppName(this, packageName)
         val appIconDrawable = AppUtils.getAppIcon(this, packageName)
         val appIconBitmap: Bitmap? = appIconDrawable?.toBitmap(64, 64)
@@ -83,6 +84,10 @@ class AccessibilityListenerService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this)) {
+            stopSelf()
+            return
+        }
         sensorUsageRepository = SensorUsageRepository(this)
         setupOverlay()
         createNotificationChannel()
@@ -200,6 +205,10 @@ class AccessibilityListenerService : AccessibilityService() {
     }
 
     private fun updateDotOverlay() {
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this)) {
+            overlayView?.visibility = View.GONE
+            return
+        }
         // Hide all by default
         overlayView?.findViewById<View>(R.id.dot_camera_container)?.visibility = View.GONE
         overlayView?.findViewById<View>(R.id.dot_mic_container)?.visibility = View.GONE
@@ -219,6 +228,7 @@ class AccessibilityListenerService : AccessibilityService() {
     }
 
     private fun logSensorUsage(sensorType: String) {
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this)) return
         val packageName = getForegroundAppPackageName() ?: "unknown"
         val appName = AppUtils.getAppName(this, packageName)
         sensorUsageRepository.logEvent(packageName, sensorType, appName)
@@ -256,6 +266,7 @@ class AccessibilityListenerService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this)) return
         if (event == null) return
         val packageName = event.packageName?.toString() ?: return
         val eventText = event.text?.joinToString(" ") ?: ""
@@ -289,5 +300,16 @@ class AccessibilityListenerService : AccessibilityService() {
             locationManager.removeUpdates(locationListener)
         }
         if (overlayView != null) windowManager?.removeView(overlayView)
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(NOTIF_ID)
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        // Remove sticky notification if tracking is disabled
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this)) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(NOTIF_ID)
+        }
+        return super.onUnbind(intent)
     }
 }

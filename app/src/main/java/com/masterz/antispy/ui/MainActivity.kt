@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -140,6 +141,7 @@ fun MainScreen(
     var cameraEnabled by remember { mutableStateOf(Preferences.isCameraEnabled(context)) }
     var micEnabled by remember { mutableStateOf(Preferences.isMicEnabled(context)) }
     var gpsEnabled by remember { mutableStateOf(Preferences.isGpsEnabled(context)) }
+    var trackingEnabled by remember { mutableStateOf(Preferences.isTrackingEnabled(context)) }
     val scrollState = rememberScrollState()
     var showPermissionDialog by remember { mutableStateOf(false) }
     val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
@@ -174,69 +176,6 @@ fun MainScreen(
                 }
             }
         }
-        // Enable tracking (accessibility)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Enable Tracking", fontSize = 18.sp, modifier = Modifier.weight(1f))
-            Switch(
-                checked = isAccessibilityEnabled,
-                onCheckedChange = { enabled ->
-                    if (!isAccessibilityEnabled && enabled) {
-                        viewModel.openAccessibilitySettings(context)
-                        showPermissionDialog = true
-                    }
-                },
-                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-            )
-        }
-        if (showPermissionDialog) {
-            Text(
-                "Please enable AntiSpy Accessibility Service in the list to allow tracking.",
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 16.sp
-            )
-        }
-        // Accessibility Status Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    if (!isAccessibilityEnabled) {
-                        viewModel.openAccessibilitySettings(context)
-                    }
-                },
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = if (isAccessibilityEnabled) Icons.Default.CameraAlt else Icons.Default.CameraAlt,
-                    contentDescription = null,
-                    tint = if (isAccessibilityEnabled) Color(0xFF4CAF50) else Color(0xFFF44336),
-                    modifier = Modifier.size(36.dp)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = if (isAccessibilityEnabled) "Accessibility Service is ENABLED" else "Accessibility Service is DISABLED",
-                        fontWeight = FontWeight.Bold,
-                        color = if (isAccessibilityEnabled) Color(0xFF4CAF50) else Color(0xFFF44336),
-                        fontSize = 18.sp
-                    )
-                    if (!isAccessibilityEnabled) {
-                        Text(
-                            text = "The dot will not work currently, tap to enable",
-                            color = Color.Gray,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-        }
         // Access Control Panel
         Text(
             text = "Access Control Panel",
@@ -249,6 +188,27 @@ fun MainScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(8.dp)) {
+                SettingSwitch(
+                    icon = Icons.Default.PowerSettingsNew,
+                    title = "Enable Tracking",
+                    checked = trackingEnabled,
+                    onCheckedChange = { enabled ->
+                        trackingEnabled = enabled
+                        Preferences.setTrackingEnabled(context, enabled)
+                        if (enabled) {
+                            if (!isAccessibilityEnabled) {
+                                viewModel.openAccessibilitySettings(context)
+                                showPermissionDialog = true
+                            } else {
+                                viewModel.enableTracking(context)
+                            }
+                        } else {
+                            viewModel.disableTracking(context)
+                        }
+                    },
+                    color = Color(0xFF009688)
+                )
+                Divider()
                 SettingSwitch(
                     icon = Icons.Default.CameraAlt,
                     title = "Camera",
