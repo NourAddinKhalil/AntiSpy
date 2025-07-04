@@ -6,7 +6,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -56,6 +58,7 @@ import androidx.compose.foundation.verticalScroll
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
+    private var locationPermissionRequested = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +67,13 @@ class MainActivity : ComponentActivity() {
         }
         viewModel.checkAccessibilityServiceEnabled()
         setContent {
+            val context = LocalContext.current
+            var showLocationPermissionDialog by remember { mutableStateOf(false) }
+            val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+                if (!isGranted) {
+                    showLocationPermissionDialog = true
+                }
+            }
             val lifecycleOwner = LocalLifecycleOwner.current
             LaunchedEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
@@ -80,7 +90,14 @@ class MainActivity : ComponentActivity() {
                         MainScreen(
                             viewModel,
                             onShowHistory = { navController.navigate("history") },
-                            onCustomizeDots = { navController.navigate("customize") }
+                            onCustomizeDots = { navController.navigate("customize") },
+                            onRequestLocationPermission = {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                }
+                            },
+                            showLocationPermissionDialog = showLocationPermissionDialog,
+                            onDismissLocationDialog = { showLocationPermissionDialog = false }
                         )
                     }
                     composable("history") {
@@ -103,7 +120,10 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     viewModel: MainViewModel,
     onShowHistory: () -> Unit,
-    onCustomizeDots: () -> Unit
+    onCustomizeDots: () -> Unit,
+    onRequestLocationPermission: () -> Unit = {},
+    showLocationPermissionDialog: Boolean = false,
+    onDismissLocationDialog: () -> Unit = {}
 ) {
     val isAccessibilityEnabled by viewModel.isAccessibilityServiceEnabled.observeAsState(false)
     val context = LocalContext.current
@@ -248,6 +268,9 @@ fun MainScreen(
                     onCheckedChange = {
                         gpsEnabled = it
                         Preferences.setGpsEnabled(context, it)
+                        if (it) {
+                            onRequestLocationPermission()
+                        }
                     },
                     color = Color(0xFF2196F3)
                 )
@@ -260,6 +283,18 @@ fun MainScreen(
         ) {
             Text("View Sensor Usage History")
         }
+    }
+    if (showLocationPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = onDismissLocationDialog,
+            title = { Text("Location Permission Required") },
+            text = { Text("To detect GPS usage, AntiSpy needs location permission. This is only used for passive detection and not for accessing your location.") },
+            confirmButton = {
+                Button(onClick = {
+                    onDismissLocationDialog()
+                }) { Text("OK") }
+            }
+        )
     }
 }
 
