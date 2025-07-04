@@ -117,11 +117,7 @@ class AccessibilityListenerService : AccessibilityService() {
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         locationListener = android.location.LocationListener { }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // Listen to all providers for better GPS detection
-            val providers = locationManager.getProviders(true)
-            for (provider in providers) {
-                locationManager.requestLocationUpdates(provider, 10000L, 0f, locationListener)
-            }
+            // Only register GnssStatus.Callback for passive detection
             locationManager.registerGnssStatusCallback(object : GnssStatus.Callback() {
                 override fun onStarted() {
                     isLocInUse = true
