@@ -8,5 +8,6 @@ data class SensorUsageEvent(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val packageName: String,
     val sensorType: String, // e.g., "camera", "microphone", "location"
-    val timestamp: Long // epoch millis
+    val timestamp: Long, // epoch millis
+    val appName: String = "" // new field for app label
 )

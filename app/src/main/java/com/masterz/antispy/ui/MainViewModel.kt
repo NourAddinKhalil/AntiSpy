@@ -41,4 +41,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ComponentName.unflattenFromString(it) == expectedComponentName
         }
     }
+
+    fun refreshAccessibilityStatus() {
+        checkAccessibilityServiceEnabled()
+    }
 }

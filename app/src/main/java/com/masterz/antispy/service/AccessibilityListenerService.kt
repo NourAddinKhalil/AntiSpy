@@ -32,6 +32,10 @@ import com.masterz.antispy.R
 import com.masterz.antispy.ui.MainActivity
 import com.masterz.antispy.model.SensorType
 import com.masterz.antispy.data.SensorUsageRepository
+import android.app.usage.UsageStats
+import android.app.usage.UsageStatsManager
+import android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS
+import com.masterz.antispy.util.AppUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -48,9 +52,29 @@ class AccessibilityListenerService : AccessibilityService() {
     private lateinit var micCallback: AudioRecordingCallback
     private lateinit var locationManager: LocationManager
     private lateinit var sensorUsageRepository: SensorUsageRepository
+    private lateinit var locationListener: android.location.LocationListener
     private var isCameraInUse = false
     private var isMicInUse = false
     private var isLocInUse = false
+
+    private fun showSensorNotification(sensorType: String, packageName: String) {
+        val appName = AppUtils.getAppName(this, packageName)
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notifId = when (sensorType) {
+            "camera" -> 100
+            "microphone" -> 101
+            "location" -> 102
+            else -> 103
+        }
+        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Sensor Access Detected")
+            .setContentText("$appName ($packageName) used $sensorType")
+            .setSmallIcon(R.drawable.ic_camera)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(notifId, notif)
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -68,6 +92,7 @@ class AccessibilityListenerService : AccessibilityService() {
             override fun onCameraUnavailable(cameraId: String) {
                 isCameraInUse = true
                 logSensorUsage("camera")
+                showSensorNotification("camera", getForegroundAppPackageName() ?: "unknown")
                 updateDotOverlay()
             }
         }
@@ -76,17 +101,27 @@ class AccessibilityListenerService : AccessibilityService() {
         micCallback = object : AudioRecordingCallback() {
             override fun onRecordingConfigChanged(configs: List<AudioRecordingConfiguration>) {
                 isMicInUse = configs.isNotEmpty()
-                if (isMicInUse) logSensorUsage("microphone")
+                if (isMicInUse) {
+                    logSensorUsage("microphone")
+                    showSensorNotification("microphone", getForegroundAppPackageName() ?: "unknown")
+                }
                 updateDotOverlay()
             }
         }
         audioManager.registerAudioRecordingCallback(micCallback, null)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        locationListener = android.location.LocationListener { }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            // Listen to all providers for better GPS detection
+            val providers = locationManager.getProviders(true)
+            for (provider in providers) {
+                locationManager.requestLocationUpdates(provider, 10000L, 0f, locationListener)
+            }
             locationManager.registerGnssStatusCallback(object : GnssStatus.Callback() {
                 override fun onStarted() {
                     isLocInUse = true
                     logSensorUsage("location")
+                    showSensorNotification("location", getForegroundAppPackageName() ?: "unknown")
                     updateDotOverlay()
                 }
                 override fun onStopped() {
@@ -94,6 +129,15 @@ class AccessibilityListenerService : AccessibilityService() {
                     updateDotOverlay()
                 }
             }, null)
+        } else {
+            // Request location permission if not granted
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                intent.data = android.net.Uri.parse("package:" + packageName)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            }
+            // Optionally, show a notification or log that location permission is required
         }
     }
 
@@ -130,16 +174,8 @@ class AccessibilityListenerService : AccessibilityService() {
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Use reflection to avoid compile error on lower APIs
-            try {
-                val mic = Class.forName("android.app.ServiceInfo").getField("FOREGROUND_SERVICE_TYPE_MICROPHONE").getInt(null)
-                val cam = Class.forName("android.app.ServiceInfo").getField("FOREGROUND_SERVICE_TYPE_CAMERA").getInt(null)
-                val loc = Class.forName("android.app.ServiceInfo").getField("FOREGROUND_SERVICE_TYPE_LOCATION").getInt(null)
-                val types = mic or cam or loc
-                val startForeground = this::class.java.getMethod("startForeground", Int::class.java, Notification::class.java, Int::class.java)
-                startForeground.invoke(this, NOTIF_ID, notification, types)
-            } catch (e: Exception) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
                 startForeground(NOTIF_ID, notification)
             }
         } else {
@@ -150,17 +186,46 @@ class AccessibilityListenerService : AccessibilityService() {
     private fun updateDotOverlay() {
         // Show overlay if any sensor is in use, else hide
         overlayView?.visibility = if (isCameraInUse || isMicInUse || isLocInUse) View.VISIBLE else View.GONE
+        overlayView?.findViewById<ImageView>(R.id.icon_camera)?.visibility = if (isCameraInUse) View.VISIBLE else View.GONE
+        overlayView?.findViewById<ImageView>(R.id.icon_mic)?.visibility = if (isMicInUse) View.VISIBLE else View.GONE
+        overlayView?.findViewById<ImageView>(R.id.icon_gps)?.visibility = if (isLocInUse) View.VISIBLE else View.GONE
     }
 
     private fun logSensorUsage(sensorType: String) {
         val packageName = getForegroundAppPackageName() ?: "unknown"
-        sensorUsageRepository.logEvent(packageName, sensorType)
+        val appName = AppUtils.getAppName(this, packageName)
+        sensorUsageRepository.logEvent(packageName, sensorType, appName)
     }
 
     private fun getForegroundAppPackageName(): String? {
-        // TODO: Implement a robust way to get the foreground app package name if possible
-        // For now, return packageName of this service
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val time = System.currentTimeMillis()
+            val appList = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 1000 * 10, time)
+            if (appList != null && appList.isNotEmpty()) {
+                val recentApp = appList.maxByOrNull { it.lastTimeUsed }
+                if (recentApp != null && recentApp.packageName != packageName) {
+                    return recentApp.packageName
+                }
+            }
+            // If usage access not granted, prompt user
+            if (!hasUsageStatsPermission()) {
+                val intent = Intent(ACTION_USAGE_ACCESS_SETTINGS)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            }
+        }
         return packageName
+    }
+
+    private fun hasUsageStatsPermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val time = System.currentTimeMillis()
+            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 1000 * 10, time)
+            return stats != null && stats.isNotEmpty()
+        }
+        return false
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -192,6 +257,9 @@ class AccessibilityListenerService : AccessibilityService() {
         }
         if (::audioManager.isInitialized && ::micCallback.isInitialized) {
             audioManager.unregisterAudioRecordingCallback(micCallback)
+        }
+        if (::locationManager.isInitialized && ::locationListener.isInitialized) {
+            locationManager.removeUpdates(locationListener)
         }
         if (overlayView != null) windowManager?.removeView(overlayView)
     }

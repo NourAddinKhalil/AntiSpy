@@ -9,12 +9,13 @@ class SensorUsageRepository(context: Context) {
     private val db = AppDatabase.getInstance(context)
     private val dao = db.sensorUsageEventDao()
 
-    fun logEvent(packageName: String, sensorType: String, timestamp: Long = System.currentTimeMillis()) {
+    fun logEvent(packageName: String, sensorType: String, appName: String = "", timestamp: Long = System.currentTimeMillis()) {
         CoroutineScope(Dispatchers.IO).launch {
             dao.insert(SensorUsageEvent(
                 packageName = packageName,
                 sensorType = sensorType,
-                timestamp = timestamp
+                timestamp = timestamp,
+                appName = appName
             ))
         }
     }

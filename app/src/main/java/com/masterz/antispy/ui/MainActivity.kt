@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
@@ -44,6 +46,13 @@ import com.masterz.antispy.service.OverlayService
 import androidx.core.app.ActivityCompat
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.masterz.antispy.util.Preferences
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -55,11 +64,24 @@ class MainActivity : ComponentActivity() {
         }
         viewModel.checkAccessibilityServiceEnabled()
         setContent {
+            val lifecycleOwner = LocalLifecycleOwner.current
+            LaunchedEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        viewModel.refreshAccessibilityStatus()
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+            }
             MaterialTheme {
                 val navController = rememberNavController()
                 NavHost(navController, startDestination = "main") {
                     composable("main") {
-                        MainScreen(viewModel, onShowHistory = { navController.navigate("history") })
+                        MainScreen(
+                            viewModel,
+                            onShowHistory = { navController.navigate("history") },
+                            onCustomizeDots = { navController.navigate("customize") }
+                        )
                     }
                     composable("history") {
                         val context = LocalContext.current.applicationContext
@@ -68,6 +90,9 @@ class MainActivity : ComponentActivity() {
                         }
                         HistoryScreen(historyViewModel) { navController.popBackStack() }
                     }
+                    composable("customize") {
+                        CustomizeDotsScreen(onBack = { navController.popBackStack() })
+                    }
                 }
             }
         }
@@ -75,22 +100,83 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(viewModel: MainViewModel, onShowHistory: () -> Unit) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    onShowHistory: () -> Unit,
+    onCustomizeDots: () -> Unit
+) {
     val isAccessibilityEnabled by viewModel.isAccessibilityServiceEnabled.observeAsState(false)
-    var cameraEnabled by remember { mutableStateOf(true) }
-    var micEnabled by remember { mutableStateOf(true) }
-    var gpsEnabled by remember { mutableStateOf(true) }
     val context = LocalContext.current
+    var cameraEnabled by remember { mutableStateOf(Preferences.isCameraEnabled(context)) }
+    var micEnabled by remember { mutableStateOf(Preferences.isMicEnabled(context)) }
+    var gpsEnabled by remember { mutableStateOf(Preferences.isGpsEnabled(context)) }
+    val scrollState = rememberScrollState()
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(8.dp),
+            .padding(8.dp)
+            .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Grant overlay permission if needed
+        if (!canDrawOverlays) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "To enable AntiSpy features, please grant overlay permission.",
+                        fontSize = 18.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + context.packageName))
+                        context.startActivity(intent)
+                    }) {
+                        Text("Grant Permission")
+                    }
+                }
+            }
+        }
+        // Enable tracking (accessibility)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Enable Tracking", fontSize = 18.sp, modifier = Modifier.weight(1f))
+            Switch(
+                checked = isAccessibilityEnabled,
+                onCheckedChange = { enabled ->
+                    if (!isAccessibilityEnabled && enabled) {
+                        viewModel.openAccessibilitySettings(context)
+                        showPermissionDialog = true
+                    }
+                },
+                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+        if (showPermissionDialog) {
+            Text(
+                "Please enable AntiSpy Accessibility Service in the list to allow tracking.",
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 16.sp
+            )
+        }
         // Accessibility Status Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (!isAccessibilityEnabled) {
+                        viewModel.openAccessibilitySettings(context)
+                    }
+                },
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Row(
@@ -137,7 +223,10 @@ fun MainScreen(viewModel: MainViewModel, onShowHistory: () -> Unit) {
                     icon = Icons.Default.CameraAlt,
                     title = "Camera",
                     checked = cameraEnabled,
-                    onCheckedChange = { cameraEnabled = it },
+                    onCheckedChange = {
+                        cameraEnabled = it
+                        Preferences.setCameraEnabled(context, it)
+                    },
                     color = Color(0xFF7C4DFF)
                 )
                 Divider()
@@ -145,7 +234,10 @@ fun MainScreen(viewModel: MainViewModel, onShowHistory: () -> Unit) {
                     icon = Icons.Default.Mic,
                     title = "Microphone",
                     checked = micEnabled,
-                    onCheckedChange = { micEnabled = it },
+                    onCheckedChange = {
+                        micEnabled = it
+                        Preferences.setMicEnabled(context, it)
+                    },
                     color = Color(0xFFFF9800)
                 )
                 Divider()
@@ -153,29 +245,12 @@ fun MainScreen(viewModel: MainViewModel, onShowHistory: () -> Unit) {
                     icon = Icons.Default.LocationOn,
                     title = "Location",
                     checked = gpsEnabled,
-                    onCheckedChange = { gpsEnabled = it },
+                    onCheckedChange = {
+                        gpsEnabled = it
+                        Preferences.setGpsEnabled(context, it)
+                    },
                     color = Color(0xFF2196F3)
                 )
-            }
-        }
-        // Customization Panel
-        Text(
-            text = "Customization Panel",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text("Customisation Center", fontWeight = FontWeight.SemiBold)
-                Text("Make dots look exactly like how you want them to look. You can change color, shape and many more.", fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { /* TODO: Open customization */ }) {
-                    Text("Customize Dots")
-                }
             }
         }
         // History Button
@@ -206,5 +281,26 @@ fun SettingSwitch(
         Spacer(modifier = Modifier.width(16.dp))
         Text(title, fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+fun CustomizeDotsScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Customize Dots") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding)) {
+            SettingsScreen()
+        }
     }
 }

@@ -47,7 +47,7 @@ fun HistoryScreen(viewModel: HistoryViewModel, onBack: () -> Unit) {
 @Composable
 fun HistoryItem(event: SensorUsageEvent) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(text = "App: ${event.packageName}", style = MaterialTheme.typography.bodyLarge)
+        Text(text = "App: ${event.appName} (${event.packageName})", style = MaterialTheme.typography.bodyLarge)
         Text(text = "Sensor: ${event.sensorType}", style = MaterialTheme.typography.bodyMedium)
         Text(text = "Time: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(event.timestamp))}", style = MaterialTheme.typography.bodySmall)
     }
