@@ -1,9 +1,5 @@
 package com.masterz.antispy.model
 
-enum class SensorType {
-    CAMERA, MICROPHONE, GPS
-}
-
 // Represents the current status of each sensor
 sealed class SensorStatus {
     object Idle : SensorStatus()

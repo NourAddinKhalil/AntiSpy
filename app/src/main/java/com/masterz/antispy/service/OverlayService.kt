@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -18,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.masterz.antispy.R
 import com.masterz.antispy.model.SensorType
 import com.masterz.antispy.ui.MainActivity
@@ -42,9 +44,24 @@ class OverlayService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         addOverlay()
-        registerReceiver(sensorReceiver, IntentFilter("com.masterz.antispy.SENSOR_STATUS"))
-        createNotificationChannel()
-        startForeground(NOTIF_ID, buildNotification(null))
+        // Only register receiver and post notifications if permission is granted (Android 13+)
+        val hasNotifPerm = if (Build.VERSION.SDK_INT >= 33) {
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+        if (hasNotifPerm) {
+            if (Build.VERSION.SDK_INT >= 34) {
+                ContextCompat.registerReceiver(
+                    this,
+                    sensorReceiver,
+                    IntentFilter("com.masterz.antispy.SENSOR_STATUS"),
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+                )
+            } else {
+                registerReceiver(sensorReceiver, IntentFilter("com.masterz.antispy.SENSOR_STATUS"))
+            }
+            createNotificationChannel()
+            startForeground(NOTIF_ID, buildNotification(null))
+        }
     }
 
     private fun addOverlay() {
