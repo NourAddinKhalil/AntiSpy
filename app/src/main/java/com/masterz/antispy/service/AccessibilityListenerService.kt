@@ -95,9 +95,14 @@ class AccessibilityListenerService : AccessibilityService() {
                 updateDotOverlay()
             }
             override fun onCameraUnavailable(cameraId: String) {
-                isCameraInUse = true
-                logSensorUsage("camera")
-                showSensorNotification("camera", getForegroundAppPackageName() ?: "unknown")
+                // Check camera preference
+                if (com.masterz.antispy.util.Preferences.isCameraEnabled(this@AccessibilityListenerService)) {
+                    isCameraInUse = true
+                    logSensorUsage("camera")
+                    showSensorNotification("camera", getForegroundAppPackageName() ?: "unknown")
+                } else {
+                    isCameraInUse = false
+                }
                 updateDotOverlay()
             }
         }
@@ -105,10 +110,15 @@ class AccessibilityListenerService : AccessibilityService() {
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         micCallback = object : AudioRecordingCallback() {
             override fun onRecordingConfigChanged(configs: List<AudioRecordingConfiguration>) {
-                isMicInUse = configs.isNotEmpty()
-                if (isMicInUse) {
-                    logSensorUsage("microphone")
-                    showSensorNotification("microphone", getForegroundAppPackageName() ?: "unknown")
+                // Check mic preference
+                if (com.masterz.antispy.util.Preferences.isMicEnabled(this@AccessibilityListenerService)) {
+                    isMicInUse = configs.isNotEmpty()
+                    if (isMicInUse) {
+                        logSensorUsage("microphone")
+                        showSensorNotification("microphone", getForegroundAppPackageName() ?: "unknown")
+                    }
+                } else {
+                    isMicInUse = false
                 }
                 updateDotOverlay()
             }
@@ -120,9 +130,14 @@ class AccessibilityListenerService : AccessibilityService() {
             // Only register GnssStatus.Callback for passive detection
             locationManager.registerGnssStatusCallback(object : GnssStatus.Callback() {
                 override fun onStarted() {
-                    isLocInUse = true
-                    logSensorUsage("location")
-                    showSensorNotification("location", getForegroundAppPackageName() ?: "unknown")
+                    // Check GPS preference
+                    if (com.masterz.antispy.util.Preferences.isGpsEnabled(this@AccessibilityListenerService)) {
+                        isLocInUse = true
+                        logSensorUsage("location")
+                        showSensorNotification("location", getForegroundAppPackageName() ?: "unknown")
+                    } else {
+                        isLocInUse = false
+                    }
                     updateDotOverlay()
                 }
                 override fun onStopped() {
@@ -189,15 +204,18 @@ class AccessibilityListenerService : AccessibilityService() {
         overlayView?.findViewById<View>(R.id.dot_camera_container)?.visibility = View.GONE
         overlayView?.findViewById<View>(R.id.dot_mic_container)?.visibility = View.GONE
         overlayView?.findViewById<View>(R.id.dot_gps_container)?.visibility = View.GONE
-        // Show the active dot
+        // Show the active dot only if enabled in preferences
+        val cameraEnabled = com.masterz.antispy.util.Preferences.isCameraEnabled(this)
+        val micEnabled = com.masterz.antispy.util.Preferences.isMicEnabled(this)
+        val gpsEnabled = com.masterz.antispy.util.Preferences.isGpsEnabled(this)
         when {
-            isCameraInUse -> overlayView?.findViewById<View>(R.id.dot_camera_container)?.visibility = View.VISIBLE
-            isMicInUse -> overlayView?.findViewById<View>(R.id.dot_mic_container)?.visibility = View.VISIBLE
-            isLocInUse -> overlayView?.findViewById<View>(R.id.dot_gps_container)?.visibility = View.VISIBLE
+            isCameraInUse && cameraEnabled -> overlayView?.findViewById<View>(R.id.dot_camera_container)?.visibility = View.VISIBLE
+            isMicInUse && micEnabled -> overlayView?.findViewById<View>(R.id.dot_mic_container)?.visibility = View.VISIBLE
+            isLocInUse && gpsEnabled -> overlayView?.findViewById<View>(R.id.dot_gps_container)?.visibility = View.VISIBLE
             else -> overlayView?.visibility = View.GONE
         }
-        // Always show overlay if any sensor is in use, else hide
-        overlayView?.visibility = if (isCameraInUse || isMicInUse || isLocInUse) View.VISIBLE else View.GONE
+        // Always show overlay if any enabled sensor is in use, else hide
+        overlayView?.visibility = if ((isCameraInUse && cameraEnabled) || (isMicInUse && micEnabled) || (isLocInUse && gpsEnabled)) View.VISIBLE else View.GONE
     }
 
     private fun logSensorUsage(sensorType: String) {
