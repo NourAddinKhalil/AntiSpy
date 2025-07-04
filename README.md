@@ -70,6 +70,16 @@ build.gradle.kts           # Project build config
 - **Notification Permission**: For showing sensor access and foreground notifications.
 - **Battery Optimization Exemption**: Ensures the service is not killed in the background.
 
+## Important Behavior
+
+- **Independent Toggles:** The app provides two independent toggles: one for the Accessibility Service (reflects system state, opens system settings) and one for Enable Tracking (controls app logic and notifications). These toggles do not sync or conflict with each other.
+- **Sticky Notification:** The persistent notification is removed immediately when tracking is disabled, regardless of the accessibility service state.
+- **No Location Access:** The app never requests or uses your actual location; it only detects when GPS hardware is active.
+
+## Troubleshooting
+
+- If the overlay dot or notifications do not appear/disappear as expected, ensure all permissions are granted and battery optimization is disabled for AntiSpy.
+
 ## How It Works
 
 1. User enables tracking and grants permissions.
