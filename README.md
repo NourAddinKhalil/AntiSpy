@@ -89,5 +89,3 @@ build.gradle.kts           # Project build config
 5. User can view history, customize settings, and control which sensors are tracked.
 
 ---
-
-**Note:** The `just_for_reference` folder and its files are not part of the final app and will be removed.
