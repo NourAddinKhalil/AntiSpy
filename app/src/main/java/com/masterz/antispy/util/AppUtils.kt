@@ -2,6 +2,7 @@ package com.masterz.antispy.util
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 
 object AppUtils {
     fun getAppName(context: Context, packageName: String): String {
@@ -12,6 +13,15 @@ object AppUtils {
             if (label.isNullOrBlank()) packageName else label.toString()
         } catch (e: Exception) {
             packageName
+        }
+    }
+
+    fun getAppIcon(context: Context, packageName: String): Drawable? {
+        return try {
+            val pm = context.packageManager
+            pm.getApplicationIcon(packageName)
+        } catch (e: Exception) {
+            null
         }
     }
 }

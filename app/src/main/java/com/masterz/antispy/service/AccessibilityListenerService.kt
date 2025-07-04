@@ -9,6 +9,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraManager.AvailabilityCallback
@@ -28,6 +29,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.widget.ImageView
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.toBitmap
 import com.masterz.antispy.R
 import com.masterz.antispy.ui.MainActivity
 import com.masterz.antispy.model.SensorType
@@ -59,6 +61,8 @@ class AccessibilityListenerService : AccessibilityService() {
 
     private fun showSensorNotification(sensorType: String, packageName: String) {
         val appName = AppUtils.getAppName(this, packageName)
+        val appIconDrawable = AppUtils.getAppIcon(this, packageName)
+        val appIconBitmap: Bitmap? = appIconDrawable?.toBitmap(64, 64)
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notifId = when (sensorType) {
             "camera" -> 100
@@ -70,6 +74,7 @@ class AccessibilityListenerService : AccessibilityService() {
             .setContentTitle("Sensor Access Detected")
             .setContentText("$appName ($packageName) used $sensorType")
             .setSmallIcon(R.drawable.ic_camera)
+            .setLargeIcon(appIconBitmap)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
@@ -184,11 +189,19 @@ class AccessibilityListenerService : AccessibilityService() {
     }
 
     private fun updateDotOverlay() {
-        // Show overlay if any sensor is in use, else hide
+        // Hide all by default
+        overlayView?.findViewById<View>(R.id.dot_camera_container)?.visibility = View.GONE
+        overlayView?.findViewById<View>(R.id.dot_mic_container)?.visibility = View.GONE
+        overlayView?.findViewById<View>(R.id.dot_gps_container)?.visibility = View.GONE
+        // Show the active dot
+        when {
+            isCameraInUse -> overlayView?.findViewById<View>(R.id.dot_camera_container)?.visibility = View.VISIBLE
+            isMicInUse -> overlayView?.findViewById<View>(R.id.dot_mic_container)?.visibility = View.VISIBLE
+            isLocInUse -> overlayView?.findViewById<View>(R.id.dot_gps_container)?.visibility = View.VISIBLE
+            else -> overlayView?.visibility = View.GONE
+        }
+        // Always show overlay if any sensor is in use, else hide
         overlayView?.visibility = if (isCameraInUse || isMicInUse || isLocInUse) View.VISIBLE else View.GONE
-        overlayView?.findViewById<ImageView>(R.id.icon_camera)?.visibility = if (isCameraInUse) View.VISIBLE else View.GONE
-        overlayView?.findViewById<ImageView>(R.id.icon_mic)?.visibility = if (isMicInUse) View.VISIBLE else View.GONE
-        overlayView?.findViewById<ImageView>(R.id.icon_gps)?.visibility = if (isLocInUse) View.VISIBLE else View.GONE
     }
 
     private fun logSensorUsage(sensorType: String) {

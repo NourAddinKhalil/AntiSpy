@@ -1,35 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/overlay_dot"
-    android:layout_width="48dp"
-    android:layout_height="48dp"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
     android:background="@android:color/transparent">
-    <View
-        android:id="@+id/dot_view"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+
+    <FrameLayout
+        android:id="@+id/dot_camera_container"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="center"
-        android:background="@drawable/dot_shape" />
-    <ImageView
-        android:id="@+id/icon_camera"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
+        android:background="@drawable/dot_shape_camera"
+        android:visibility="gone">
+        <ImageView
+            android:id="@+id/icon_camera"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_camera"
+            android:tint="@android:color/white" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/dot_mic_container"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="center"
-        android:src="@drawable/ic_camera"
-        android:visibility="gone" />
-    <ImageView
-        android:id="@+id/icon_mic"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
+        android:background="@drawable/dot_shape_mic"
+        android:visibility="gone">
+        <ImageView
+            android:id="@+id/icon_mic"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_mic"
+            android:tint="@android:color/white" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/dot_gps_container"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="center"
-        android:src="@drawable/ic_mic"
-        android:visibility="gone" />
-    <ImageView
-        android:id="@+id/icon_gps"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:layout_gravity="center"
-        android:src="@drawable/ic_gps"
-        android:visibility="gone" />
-    <!-- TODO: Add icons for camera/mic/gps as needed -->
+        android:background="@drawable/dot_shape_gps"
+        android:visibility="gone">
+        <ImageView
+            android:id="@+id/icon_gps"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_gps"
+            android:tint="@android:color/white" />
+    </FrameLayout>
 </FrameLayout>
