@@ -65,6 +65,16 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
         }
+        // Battery optimization check
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+            val packageName = packageName
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                intent.data = android.net.Uri.parse("package:" + packageName)
+                startActivity(intent)
+            }
+        }
         viewModel.checkAccessibilityServiceEnabled()
         setContent {
             val context = LocalContext.current
