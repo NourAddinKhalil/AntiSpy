@@ -138,10 +138,11 @@ fun MainScreen(
 ) {
     val isAccessibilityEnabled by viewModel.isAccessibilityServiceEnabled.observeAsState(false)
     val context = LocalContext.current
+    // Sync trackingEnabled with accessibility state on every recomposition
     var cameraEnabled by remember { mutableStateOf(Preferences.isCameraEnabled(context)) }
     var micEnabled by remember { mutableStateOf(Preferences.isMicEnabled(context)) }
     var gpsEnabled by remember { mutableStateOf(Preferences.isGpsEnabled(context)) }
-    var trackingEnabled by remember { mutableStateOf(Preferences.isTrackingEnabled(context)) }
+    var trackingEnabled by remember { mutableStateOf(isAccessibilityEnabled && Preferences.isTrackingEnabled(context)) }
     val scrollState = rememberScrollState()
     var showPermissionDialog by remember { mutableStateOf(false) }
     val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
@@ -176,6 +177,33 @@ fun MainScreen(
                 }
             }
         }
+        // Accessibility Service Toggle
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Accessibility Service", fontSize = 18.sp, modifier = Modifier.weight(1f))
+            Switch(
+                checked = isAccessibilityEnabled,
+                onCheckedChange = { enabled ->
+                    if (!isAccessibilityEnabled && enabled) {
+                        viewModel.openAccessibilitySettings(context)
+                        showPermissionDialog = true
+                    } else if (isAccessibilityEnabled && !enabled) {
+                        // User must disable in system settings
+                        viewModel.openAccessibilitySettings(context)
+                    }
+                },
+                colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF4CAF50))
+            )
+        }
+        if (showPermissionDialog) {
+            Text(
+                "Please enable AntiSpy Accessibility Service in the list to allow tracking.",
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 16.sp
+            )
+        }
         // Access Control Panel
         Text(
             text = "Access Control Panel",
@@ -196,12 +224,7 @@ fun MainScreen(
                         trackingEnabled = enabled
                         Preferences.setTrackingEnabled(context, enabled)
                         if (enabled) {
-                            if (!isAccessibilityEnabled) {
-                                viewModel.openAccessibilitySettings(context)
-                                showPermissionDialog = true
-                            } else {
-                                viewModel.enableTracking(context)
-                            }
+                            viewModel.enableTracking(context)
                         } else {
                             viewModel.disableTracking(context)
                         }
@@ -265,6 +288,19 @@ fun MainScreen(
                 }) { Text("OK") }
             }
         )
+    }
+    // When accessibility is turned off, also turn off tracking in UI
+    LaunchedEffect(isAccessibilityEnabled) {
+        if (!isAccessibilityEnabled && trackingEnabled) {
+            trackingEnabled = false
+        }
+    }
+    // When tracking is enabled but accessibility is off, force switch off
+    LaunchedEffect(trackingEnabled, isAccessibilityEnabled) {
+        if (trackingEnabled && !isAccessibilityEnabled) {
+            trackingEnabled = false
+            Preferences.setTrackingEnabled(context, false)
+        }
     }
 }
 

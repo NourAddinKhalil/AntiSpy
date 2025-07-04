@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -311,5 +312,32 @@ class AccessibilityListenerService : AccessibilityService() {
             nm.cancel(NOTIF_ID)
         }
         return super.onUnbind(intent)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "com.masterz.antispy.STOP_FOREGROUND") {
+            stopForeground(true)
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(NOTIF_ID)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        // If service is started without accessibility permission or tracking disabled, stop immediately
+        if (!com.masterz.antispy.util.Preferences.isTrackingEnabled(this) || !isServiceEnabled()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun isServiceEnabled(): Boolean {
+        val expectedComponentName = ComponentName(this, AccessibilityListenerService::class.java)
+        val enabledServices = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        return enabledServices.split(":").any {
+            ComponentName.unflattenFromString(it) == expectedComponentName
+        }
     }
 }

@@ -47,18 +47,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disableTracking(context: Context) {
-        // Stop the accessibility service and remove sticky notification
-        try {
-            val stopIntent = Intent(context, Class.forName("com.masterz.antispy.service.AccessibilityListenerService"))
-            context.stopService(stopIntent)
-        } catch (e: Exception) {
-            // Optionally log error
-        }
-        // Remove sticky notification if present
+        // Remove sticky notification if present (try both NOTIF_ID and service notification)
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
         nm.cancel(2) // 2 is NOTIF_ID in AccessibilityListenerService
-        // Optionally update UI state
-        _isAccessibilityServiceEnabled.postValue(false)
+        // Only send STOP_FOREGROUND action, do not call stopService directly
+        try {
+            val stopForegroundIntent = Intent(context, Class.forName("com.masterz.antispy.service.AccessibilityListenerService"))
+            stopForegroundIntent.action = "com.masterz.antispy.STOP_FOREGROUND"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(stopForegroundIntent)
+            } else {
+                context.startService(stopForegroundIntent)
+            }
+        } catch (e: Exception) {}
     }
 
     fun enableTracking(context: Context) {
